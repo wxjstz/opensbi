@@ -178,7 +178,7 @@ int aclint_mtimer_warm_init(void)
 }
 
 int aclint_mtimer_cold_init(struct aclint_mtimer_data *mt,
-			    struct aclint_mtimer_data *reference)
+			    struct aclint_mtimer_data *reference, bool use_dt_memregion)
 {
 	u32 i;
 	int rc;
@@ -235,7 +235,9 @@ int aclint_mtimer_cold_init(struct aclint_mtimer_data *mt,
 	}
 
 	/* Add MTIMER regions to the root domain */
-	if (mt->mtime_addr == (mt->mtimecmp_addr + mt->mtimecmp_size)) {
+	if (use_dt_memregion)
+		;
+	else if (mt->mtime_addr == (mt->mtimecmp_addr + mt->mtimecmp_size)) {
 		rc = sbi_domain_root_add_memrange(mt->mtimecmp_addr,
 					mt->mtime_size + mt->mtimecmp_size,
 					MTIMER_REGION_ALIGN,

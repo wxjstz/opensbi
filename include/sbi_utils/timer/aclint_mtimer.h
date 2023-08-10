@@ -50,6 +50,6 @@ void aclint_mtimer_set_reference(struct aclint_mtimer_data *mt,
 int aclint_mtimer_warm_init(void);
 
 int aclint_mtimer_cold_init(struct aclint_mtimer_data *mt,
-			    struct aclint_mtimer_data *reference);
+			    struct aclint_mtimer_data *reference, bool aclint_mtimer_cold_init);
 
 #endif

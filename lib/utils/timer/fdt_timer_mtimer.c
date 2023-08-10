@@ -33,6 +33,7 @@ static int timer_mtimer_cold_init(void *fdt, int nodeoff,
 				  const struct fdt_match *match)
 {
 	int rc;
+	bool use_dt_memregions;
 	unsigned long addr[2], size[2];
 	struct timer_mtimer_node *mtn, *n;
 	struct aclint_mtimer_data *mt;
@@ -98,8 +99,10 @@ static int timer_mtimer_cold_init(void *fdt, int nodeoff,
 		mt->has_shared_mtime = true;
 	}
 
+	use_dt_memregions = fdt_device_add_memrange_to_root_domain(fdt, nodeoff);
+
 	/* Initialize the MTIMER device */
-	rc = aclint_mtimer_cold_init(mt, mt_reference);
+	rc = aclint_mtimer_cold_init(mt, mt_reference, use_dt_memregions);
 	if (rc) {
 		sbi_free(mtn);
 		return rc;
