@@ -533,3 +533,123 @@ int fdt_domains_populate(void *fdt)
 	return fdt_iterate_each_domain(fdt, &cold_domain_offset,
 				       __fdt_parse_domain);
 }
+
+static int __fdt_device_parse_region(void *fdt, int nodeoff,
+			      int region_offset, u32 region_access,
+			      void *opaque)
+{
+	int len;
+	u32 val32;
+	u64 val64;
+	const u32 *val;
+	struct parse_region_data *preg = opaque;
+	struct sbi_domain_memregion *region;
+
+	/* Find next region of the domain */
+	if (preg->max_regions <= preg->region_count)
+		return SBI_ENOSPC;
+	region = &preg->dom->regions[preg->region_count];
+
+	/* Read "base" DT property */
+	val = fdt_getprop(fdt, region_offset, "base", &len);
+	if (!val || len != 8)
+		return SBI_EINVAL;
+	val64 = fdt32_to_cpu(val[0]);
+	val64 = (val64 << 32) | fdt32_to_cpu(val[1]);
+	region->base = val64;
+
+	/* Read "order" DT property */
+	val = fdt_getprop(fdt, region_offset, "order", &len);
+	if (!val || len != 4)
+		return SBI_EINVAL;
+	val32 = fdt32_to_cpu(*val);
+	if (val32 < 3 || __riscv_xlen < val32)
+		return SBI_EINVAL;
+	region->order = val32;
+
+	/* Read "mmio" DT property */
+	region->flags = region_access & SBI_DOMAIN_MEMREGION_ACCESS_MASK;
+	if (fdt_get_property(fdt, region_offset, "mmio", NULL))
+		region->flags |= SBI_DOMAIN_MEMREGION_MMIO;
+
+	preg->region_count++;
+
+	return 0;
+}
+
+static int fdt_device_iterate_each_memregion(void *fdt, int nodeoff, void *opaque,
+					 int (*fn)(void *fdt, int nodeoff,
+					 int region_offset, u32 region_access,
+					 void *opaque))
+{
+	u32 i, rcount;
+	int rc, len, region_offset;
+	const u32 *regions;
+
+	if (!fdt || (nodeoff < 0) || !fn)
+		return SBI_EINVAL;
+
+	regions = fdt_getprop(fdt, nodeoff, "regions", &len);
+	if (!regions)
+		return SBI_EINVAL;
+
+	rcount = (u32)len / (sizeof(u32) * 2);
+	for (i = 0; i < rcount; i++) {
+		region_offset = fdt_node_offset_by_phandle(fdt,
+						fdt32_to_cpu(regions[2 * i]));
+		if (region_offset < 0)
+			return region_offset;
+
+		if (fdt_node_check_compatible(fdt, region_offset,
+					      "opensbi,domain,memregion"))
+			return SBI_EINVAL;
+
+		rc = fn(fdt, domain_offset, region_offset,
+			fdt32_to_cpu(regions[(2 * i) + 1]), opaque);
+		if (rc)
+			return rc;
+	}
+
+	return 0;
+}
+
+int fdt_device_add_memrange_to_root_domain(void *fdt, int nodeoff)
+{
+	int err = 0;
+	struct parse_region_data preg;
+	struct sbi_domain *dom;
+	struct sbi_domain_memregion *mreg;
+
+	dom = sbi_zalloc(sizeof(*dom));
+	if (!dom)
+		return SBI_ENOMEM;
+
+	dom->regions = sbi_calloc(sizeof(*dom->regions),
+				  FDT_DOMAIN_REGION_MAX_COUNT + 1);
+	if (!dom->regions) {
+		sbi_free(dom);
+		return SBI_ENOMEM;
+	}
+	preg.dom = dom;
+	preg.region_count = 0;
+	preg.max_regions = FDT_DOMAIN_REGION_MAX_COUNT;
+
+	/* Setup memregions from DT */
+	fdt_device_iterate_each_memregion(fdt, nodeoff, &preg,
+					 __fdt_device_parse_region);
+
+	/* add memregions to root domain */
+	sbi_domain_for_each_memregion(dom, mreg) {
+		err = sbi_domain_root_add_memregion(mreg);
+		/* Because multiple devices may be in a memregion, so the
+		 * memregion may be added to the root domain multiple times */
+		if (err == SBI_EALREADY)
+			err = 0;
+		if (err)
+			break;
+	}
+
+	sbi_free(dom->regions);
+	sbi_free(dom);
+	return err;
+}

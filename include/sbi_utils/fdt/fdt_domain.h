@@ -72,6 +72,16 @@ void fdt_domain_fixup(void *fdt);
  */
 int fdt_domains_populate(void *fdt);
 
+/**
+ * Obtain memrange from the DT and add it to the root domain
+ *
+ * @param fdt device tree blob
+ * @nodeoff device DT node offset
+ *
+ * @return 0 on success and negative error code on failure
+*/
+int fdt_device_add_memrange_to_root_domain(void *fdt, int nodeoff)
+
 #else
 
 static inline void fdt_domain_fixup(void *fdt) { }
