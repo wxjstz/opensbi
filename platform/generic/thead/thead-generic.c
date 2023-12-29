@@ -252,6 +252,7 @@ static const struct fdt_match thead_generic_match[] = {
 	{ .compatible = "sophgo,sg2002", .data = &thead_pmu_quirks },
 	{ .compatible = "sophgo,sg2044", .data = &thead_pmu_quirks },
 	{ .compatible = "thead,th1520", .data = &thead_light_quirks },
+        { .compatible = "thead,light", .data = &thead_light_quirks },
 	{ },
 };
 
