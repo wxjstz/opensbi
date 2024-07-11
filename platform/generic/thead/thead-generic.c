@@ -11,6 +11,7 @@
 #include <thead/c9xx_errata.h>
 #include <thead/c9xx_pmu.h>
 #include <thead/light/asm.h>
+#include <thead/thead_aon.h>
 #include <sbi/riscv_io.h>
 #include <sbi/sbi_const.h>
 #include <sbi/sbi_console.h>
@@ -20,6 +21,8 @@
 #include <sbi/sbi_string.h>
 #include <sbi/sbi_hsm.h>
 #include <sbi_utils/fdt/fdt_helper.h>
+#include <sbi/sbi_system.h>
+
 
 #define SBI_EXT_VENDOR_SMC      (SBI_EXT_VENDOR_START + 0)
 #define SBI_EXT_VENDOR_PMU      (SBI_EXT_VENDOR_START + 1)
@@ -60,6 +63,7 @@ static unsigned long csr_mhint4;
 
 extern int hotplug_flag;
 extern const struct sbi_hsm_device light_ppu;
+extern struct sbi_system_suspend_device th1520_susp;
 static u32 selected_hartid = 0;
 struct thead_generic_quirks {
 	u64	errata;
@@ -386,6 +390,11 @@ static int thead_generic_final_init(bool cold_boot)
 {
 	if (cold_boot) {
 		sbi_hsm_set_device(&light_ppu);
+		sbi_system_suspend_set_device(&th1520_susp);
+		if(thead_aon_init()) {
+			sbi_printf("thead aon init faild");
+			return -1;
+		}
 		if (request_ecall_light)
 			sbi_ecall_register_extension(&ecall_light);
 	}
