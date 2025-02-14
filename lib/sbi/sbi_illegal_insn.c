@@ -17,6 +17,7 @@
 #include <sbi/sbi_bitops.h>
 #include <sbi/sbi_emulate_csr.h>
 #include <sbi/sbi_error.h>
+#include <sbi/sbi_hext.h>
 #include <sbi/sbi_illegal_atomic.h>
 #include <sbi/sbi_illegal_insn.h>
 #include <sbi/sbi_insn_emu.h>
@@ -83,7 +84,6 @@ static int system_opcode_insn(ulong insn, struct sbi_trap_regs *regs)
 		return SBI_EFAIL;
 	}
 
-	/* Ensure that we got CSR read/write instruction */
 	int funct3 = GET_RM(insn);
 	if (funct3 == 0 || funct3 == 4) {
 		/* Handle "Zawrs" Wait-on-Reservation-Set */
@@ -99,6 +99,9 @@ static int system_opcode_insn(ulong insn, struct sbi_trap_regs *regs)
 			regs->mepc += 4;
 			return 0;
 		}
+
+		if (sbi_hext_insn(insn, regs) == 0)
+			return 0;
 
 		/* Otherwise treat this as an error */
 		sbi_printf("%s: Invalid opcode for CSR read/write instruction",
