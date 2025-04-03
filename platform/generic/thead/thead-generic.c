@@ -110,6 +110,7 @@ static int thead_tlb_flush_early_init(bool cold_boot)
 static int thead_pmu_extensions_init(struct sbi_hart_features *hfeatures)
 {
 	int rc;
+	struct sbi_scratch *scratch = sbi_scratch_thishart_ptr();
 
 	rc = generic_extensions_init(hfeatures);
 	if (rc)
@@ -117,6 +118,8 @@ static int thead_pmu_extensions_init(struct sbi_hart_features *hfeatures)
 
 	thead_c9xx_register_pmu_device();
 
+	if (errata & THEAD_QUIRK_ERRATA_XTHEADSSTC)
+		sbi_hart_update_extension(scratch, SBI_HART_EXT_SSTC, false);
 	return 0;
 }
 
