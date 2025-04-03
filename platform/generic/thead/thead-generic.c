@@ -101,6 +101,9 @@ static int thead_tlb_flush_early_init(bool cold_boot)
 
 	thead_register_tlb_flush_trap_handler();
 
+	if (errata & THEAD_QUIRK_ERRATA_XTHEADSSTC)
+		csr_set(CSR_MXSTATUS, BIT_ULL(17));
+
 	return generic_early_init(cold_boot);
 }
 
@@ -448,7 +451,7 @@ static int thead_generic_platform_init(const void *fdt, int nodeoff,
 
 
 static struct thead_generic_quirks thead_th1520_quirks = {
-	.errata = THEAD_QUIRK_ERRATA_LOGHT_PPU,
+	.errata = THEAD_QUIRK_ERRATA_LOGHT_PPU | THEAD_QUIRK_ERRATA_XTHEADSSTC,
 };
 
 
