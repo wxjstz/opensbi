@@ -149,6 +149,12 @@ struct sbi_platform_operations {
 			unsigned long log2len);
 	/** platform specific pmp disable on current HART */
 	void (*pmp_disable)(unsigned int n);
+
+	/** platform specifice hander to read CSR */
+	int (*vendor_csr_read)(int csr_num, unsigned long *out);
+
+	/** platform specifice hander to write CSR */
+	int (*vendor_csr_write)(int csr_num, unsigned long val);
 };
 
 /** Platform default per-HART stack size for exception/interrupt handling */
@@ -681,6 +687,37 @@ static inline void sbi_platform_pmp_disable(const struct sbi_platform *plat,
 {
 	if (plat && sbi_platform_ops(plat)->pmp_disable)
 		sbi_platform_ops(plat)->pmp_disable(n);
+}
+/**
+ * Platform specific handle to read CSR
+ *
+ * @param plat pointer to struct sbi_platform
+ * @param csr_num address of the CSR to be operated
+ * @param out pointer address to hold the value read from the CSR.
+ *
+ * @return 0 on success
+ */
+static inline int sbi_platform_csr_read(const struct sbi_platform *plat, int csr_num, unsigned long *out)
+{
+	if (plat && sbi_platform_ops(plat)->vendor_csr_read)
+		return sbi_platform_ops(plat)->vendor_csr_read(csr_num, out);
+	return SBI_ENOTSUPP;
+}
+
+/**
+ * Platform specific handle to write CSR
+ *
+ * @param plat pointer to struct sbi_platform
+ * @param csr_num address of the CSR to be operated
+ * @param value the value that needs to be written into the CSR
+ *
+ * @return 0 on success
+ */
+static inline int sbi_platform_csr_write(const struct sbi_platform *plat, int csr_num, unsigned long val)
+{
+	if (plat && sbi_platform_ops(plat)->vendor_csr_write)
+		return sbi_platform_ops(plat)->vendor_csr_write(csr_num, val);
+	return SBI_ENOTSUPP;
 }
 
 #endif

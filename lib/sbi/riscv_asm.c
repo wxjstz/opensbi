@@ -158,7 +158,9 @@ unsigned long csr_read_num(int csr_num)
 #endif
 
 	default:
-		sbi_panic("%s: Unknown CSR %#x", __func__, csr_num);
+		if (sbi_platform_csr_read(sbi_platform_thishart_ptr(),
+					    csr_num, &ret))
+			sbi_panic("%s: Unknown CSR %#x", __func__, csr_num);
 		break;
 	}
 
@@ -230,7 +232,9 @@ void csr_write_num(int csr_num, unsigned long val)
 	switchcase_csr_write_16(CSR_MHPMEVENT16, val)
 
 	default:
-		sbi_panic("%s: Unknown CSR %#x", __func__, csr_num);
+		if (sbi_platform_csr_write(sbi_platform_thishart_ptr(),
+					    csr_num, val))
+			sbi_panic("%s: Unknown CSR %#x", __func__, csr_num);
 		break;
 	}
 
