@@ -76,6 +76,12 @@ struct sbi_pmu_device {
 	int (*fw_counter_stop)(uint32_t hartid, uint32_t counter_index);
 
 	/**
+	 * Custom to get hardware counter event csr addr
+	 * Note: 0 <= counter_index < SBI_PMU_HW_CTR_MAX
+	 */
+	int (*hw_counter_event_csr)(uint32_t counter_index, bool high32);
+
+	/**
 	 * Custom enable irq for hardware counter
 	 * Note: 0 <= counter_index < SBI_PMU_HW_CTR_MAX
 	 */

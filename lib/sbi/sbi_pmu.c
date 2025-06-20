@@ -206,6 +206,19 @@ static int pmu_ctr_validate(struct sbi_pmu_hart_state *phs,
 	return event_idx_type;
 }
 
+static int pmu_hwcounter_event_csr(uint32_t counter_index, bool high32)
+{
+	if (pmu_dev && pmu_dev->hw_counter_event_csr)
+		return pmu_dev->hw_counter_event_csr(counter_index, high32);
+	if (counter_index < 3 || counter_index >= SBI_PMU_HW_CTR_MAX)
+		return -1;
+#if __riscv_xlen == 32
+	if (high32)
+		return CSR_MHPMEVENT3H + counter_index - 3;
+#endif
+	return CSR_MHPMEVENT3 + counter_index - 3;
+}
+
 static bool pmu_ctr_idx_validate(unsigned long cbase, unsigned long cmask)
 {
 	/* Do a basic sanity check of counter base & mask */
@@ -324,21 +337,20 @@ void sbi_pmu_ovf_irq()
 
 static int pmu_ctr_enable_irq_hw(int ctr_idx)
 {
-	unsigned long mhpmevent_csr;
+	int mhpmevent_csr;
 	unsigned long mhpmevent_curr;
 	unsigned long mip_val;
 	unsigned long of_mask;
 
-	if (ctr_idx < 3 || ctr_idx >= SBI_PMU_HW_CTR_MAX)
-		return SBI_EFAIL;
-
 #if __riscv_xlen == 32
-	mhpmevent_csr = CSR_MHPMEVENT3H  + ctr_idx - 3;
+	mhpmevent_csr = pmu_hwcounter_event_csr(ctr_idx, true);
 	of_mask = (uint32_t)~MHPMEVENTH_OF;
 #else
-	mhpmevent_csr = CSR_MHPMEVENT3 + ctr_idx - 3;
+	mhpmevent_csr = pmu_hwcounter_event_csr(ctr_idx, false);
 	of_mask = ~MHPMEVENT_OF;
 #endif
+	if (mhpmevent_csr < 0)
+		return SBI_EFAIL;
 
 	mhpmevent_curr = csr_read_num(mhpmevent_csr);
 	mip_val = csr_read(CSR_MIP);
@@ -556,15 +568,19 @@ static int pmu_ctr_stop_fw(struct sbi_pmu_hart_state *phs,
 
 static int pmu_reset_hw_mhpmevent(int ctr_idx)
 {
-	if (ctr_idx < 3 || ctr_idx >= SBI_PMU_HW_CTR_MAX)
+	int mhpmevent_csr = pmu_hwcounter_event_csr(ctr_idx, false);
+	if (mhpmevent_csr < 0)
 		return SBI_EFAIL;
+
 #if __riscv_xlen == 32
-	csr_write_num(CSR_MHPMEVENT3 + ctr_idx - 3, 0);
+	csr_write_num(mhpmevent_csr, 0);
 	if (sbi_hart_has_extension(sbi_scratch_thishart_ptr(),
-				   SBI_HART_EXT_SSCOFPMF))
-		csr_write_num(CSR_MHPMEVENT3H + ctr_idx - 3, 0);
+				   SBI_HART_EXT_SSCOFPMF)) {
+		mhpmevent_csr = pmu_hwcounter_event_csr(ctr_idx, true);
+		csr_write_num(mhpmevent_csr, 0);
+	}
 #else
-	csr_write_num(CSR_MHPMEVENT3 + ctr_idx - 3, 0);
+	csr_write_num(mhpmevent_csr, 0);
 #endif
 
 	return 0;
@@ -633,11 +649,11 @@ static int pmu_update_hw_mhpmevent(struct sbi_pmu_hw_event *hw_evt, int ctr_idx,
 	struct sbi_scratch *scratch = sbi_scratch_thishart_ptr();
 	const struct sbi_platform *plat = sbi_platform_ptr(scratch);
 	uint64_t mhpmevent_val;
-
+	int mhpmevent_csr = pmu_hwcounter_event_csr(ctr_idx, false);
 	/* Get the final mhpmevent value to be written from platform */
 	mhpmevent_val = sbi_platform_pmu_xlate_to_mhpmevent(plat, eindex, data);
 
-	if (!mhpmevent_val || ctr_idx < 3 || ctr_idx >= SBI_PMU_HW_CTR_MAX)
+	if (!mhpmevent_val || mhpmevent_csr < 0)
 		return SBI_EFAIL;
 
 	/**
@@ -658,12 +674,13 @@ static int pmu_update_hw_mhpmevent(struct sbi_pmu_hw_event *hw_evt, int ctr_idx,
 		pmu_dev->hw_counter_filter_mode(flags, ctr_idx);
 
 #if __riscv_xlen == 32
-	csr_write_num(CSR_MHPMEVENT3 + ctr_idx - 3, mhpmevent_val & 0xFFFFFFFF);
-	if (sbi_hart_has_extension(scratch, SBI_HART_EXT_SSCOFPMF))
-		csr_write_num(CSR_MHPMEVENT3H + ctr_idx - 3,
-			      mhpmevent_val >> BITS_PER_LONG);
+	csr_write_num(mhpmevent_csr, mhpmevent_val & 0xFFFFFFFF);
+	if (sbi_hart_has_extension(scratch, SBI_HART_EXT_SSCOFPMF)) {
+		mhpmevent_csr = pmu_hwcounter_event_csr(ctr_idx, true);
+		csr_write_num(mhpmevent_csr, mhpmevent_val >> BITS_PER_LONG);
+	}
 #else
-	csr_write_num(CSR_MHPMEVENT3 + ctr_idx - 3, mhpmevent_val);
+	csr_write_num(mhpmevent_csr, mhpmevent_val);
 #endif
 
 	return 0;
