@@ -91,6 +91,8 @@ struct hext_state {
 	unsigned long satp;
 	unsigned long vsatp;
 
+	uint64_t vstimecmp;
+
 	bool virt;
 	bool available;
 };

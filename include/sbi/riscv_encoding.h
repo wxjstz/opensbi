@@ -463,6 +463,8 @@
 #define CSR_HVICTL			0x609
 #define CSR_HVIPRIO1			0x646
 #define CSR_HVIPRIO2			0x647
+#define CSR_VSTIMECMP			0x24d
+#define CSR_VSTIMECMPH			0x25d
 
 /* Virtual Supervisor Indirect Alias */
 #define CSR_VSISELECT			0x250

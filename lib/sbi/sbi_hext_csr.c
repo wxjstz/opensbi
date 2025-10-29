@@ -128,7 +128,14 @@ int sbi_hext_csr_read(int csr_num, struct sbi_trap_regs *regs,
 		*csr_val = 0;
 
 		return SBI_OK;
-
+	case CSR_VSTIMECMP:
+		*csr_val = hext->vstimecmp;
+		return SBI_OK;
+#if __riscv_xlen == 32
+	case CSR_VSTIMECMPH:
+		*csr_val = hext->vstimecmp >> 32;
+		return SBI_OK;
+#endif
 	default:
 		sbi_panic("%s: CSR read 0x%03x: Not implemented\n", __func__,
 			  csr_num);
@@ -298,7 +305,14 @@ int sbi_hext_csr_write(int csr_num, struct sbi_trap_regs *regs,
 		/* hardwire to 0 */
 
 		return SBI_OK;
-
+	case CSR_VSTIMECMP:
+		csr_val = sanitize_csr(CSR_STIMECMP, hext->vstimecmp, csr_val);
+		return SBI_OK;
+#if __riscv_xlen == 32
+	case CSR_VSTIMECMPH:
+		csr_val = sanitize_csr(CSR_STIMECMPH, hext->vstimecmp >> 32, csr_val);
+		return SBI_OK;
+#endif
 	default:
 		sbi_printf("%s: CSR write 0x%03x: Not implemented\n", __func__,
 			   csr_num);
