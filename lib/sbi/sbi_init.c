@@ -486,6 +486,10 @@ static void __noreturn init_warm_startup(struct sbi_scratch *scratch,
 	if (rc)
 		sbi_hart_hang();
 
+	rc = sbi_hext_init(scratch, false);
+	if (rc)
+		sbi_hart_hang();
+
 	rc = sbi_platform_final_init(plat, false);
 	if (rc)
 		sbi_hart_hang();
@@ -516,10 +520,6 @@ static void __noreturn init_warm_resume(struct sbi_scratch *scratch,
 	sbi_hsm_hart_resume_start(scratch);
 
 	rc = sbi_hart_reinit(scratch);
-	if (rc)
-		sbi_hart_hang();
-
-	rc = sbi_hext_init(scratch, false);
 	if (rc)
 		sbi_hart_hang();
 
