@@ -21,6 +21,7 @@
 #include <sbi/sbi_hsm.h>
 #include <sbi/sbi_init.h>
 #include <sbi/sbi_ipi.h>
+#include <sbi/sbi_platform.h>
 #include <sbi/sbi_scratch.h>
 #include <sbi/sbi_system.h>
 #include <sbi/sbi_timer.h>
@@ -50,6 +51,7 @@ struct sbi_hsm_data {
 	unsigned long saved_mideleg;
 	u64 saved_menvcfg;
 	atomic_t start_ticket;
+	unsigned long platform_saved[0];
 };
 
 bool sbi_hsm_hart_change_state(struct sbi_scratch *scratch, long oldstate,
@@ -249,9 +251,13 @@ int sbi_hsm_init(struct sbi_scratch *scratch, bool cold_boot)
 {
 	struct sbi_scratch *rscratch;
 	struct sbi_hsm_data *hdata;
+	unsigned long n;
 
 	if (cold_boot) {
-		hart_data_offset = sbi_scratch_alloc_offset(sizeof(*hdata));
+		n = sbi_platform_suspend_backup_csr_count(
+			sbi_platform_ptr(scratch));
+		hart_data_offset = sbi_scratch_alloc_offset(sizeof(*hdata) +
+							    n * sizeof(long));
 		if (!hart_data_offset)
 			return SBI_ENOMEM;
 
@@ -430,6 +436,8 @@ void __sbi_hsm_suspend_non_ret_save(struct sbi_scratch *scratch)
 	hdata->saved_mideleg = csr_read(CSR_MIDELEG);
 	if (sbi_hart_priv_version(scratch) >= SBI_HART_PRIV_VER_1_12)
 		hdata->saved_menvcfg = csr_read64(CSR_MENVCFG);
+
+	sbi_platform_suspend_non_ret_save(sbi_platform_ptr(scratch), hdata->platform_saved);
 }
 
 static void __sbi_hsm_suspend_non_ret_restore(struct sbi_scratch *scratch)
@@ -443,6 +451,8 @@ static void __sbi_hsm_suspend_non_ret_restore(struct sbi_scratch *scratch)
 	csr_write(CSR_MEDELEG, hdata->saved_medeleg);
 	csr_write(CSR_MIE, hdata->saved_mie);
 	csr_set(CSR_MIP, (hdata->saved_mip & (MIP_SSIP | MIP_STIP)));
+
+	sbi_platform_suspend_non_ret_restore(sbi_platform_ptr(scratch), hdata->platform_saved);
 }
 
 void sbi_hsm_hart_resume_start(struct sbi_scratch *scratch)

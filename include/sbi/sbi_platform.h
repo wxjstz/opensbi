@@ -41,6 +41,9 @@
 #define SBI_PLATFORM_HART_INDEX2ID_OFFSET (0x60 + (__SIZEOF_POINTER__ * 2))
 /** Offset of cbom_block_size in struct sbi_platform */
 #define SBI_PLATFORM_CBOM_BLOCK_SIZE_OFFSET (0x60 + (__SIZEOF_POINTER__ * 3))
+/** Offset of suspend_backup_csr_count in struct sbi_platform */
+#define SBI_PLATFORM_SUSPEND_BACKUP_CSR_COUNT_OFFSET \
+					    (0x60 + (__SIZEOF_POINTER__ * 4))
 
 #define SBI_PLATFORM_TLB_RANGE_FLUSH_LIMIT_DEFAULT		(1UL << 12)
 
@@ -146,6 +149,12 @@ struct sbi_platform_operations {
 			unsigned long log2len);
 	/** platform specific pmp disable on current HART */
 	void (*pmp_disable)(unsigned int n);
+
+	/** Save platform specific CSR before suspend */
+	void (*suspend_non_ret_save)(unsigned long *data);
+
+	/** Restore platform specific CSR after suspend */
+	void (*suspend_non_ret_restore)(unsigned long *data);
 };
 
 /** Platform default per-HART stack size for exception/interrupt handling */
@@ -198,6 +207,13 @@ struct sbi_platform {
 	const u32 *hart_index2id;
 	/** Allocation alignment for Scratch */
 	unsigned long cbom_block_size;
+
+	/**
+	 * When HART enters suspend mode, some platforms require specific CSRs
+	 * to be saved for recovery. This variable tracks how many CSRs need to
+	 *  be backed up for this platform.
+	 */
+	unsigned long suspend_backup_csr_count;
 };
 
 /**
@@ -216,6 +232,8 @@ assert_member_offset(struct sbi_platform, platform_ops_addr, SBI_PLATFORM_OPS_OF
 assert_member_offset(struct sbi_platform, firmware_context, SBI_PLATFORM_FIRMWARE_CONTEXT_OFFSET);
 assert_member_offset(struct sbi_platform, hart_index2id, SBI_PLATFORM_HART_INDEX2ID_OFFSET);
 assert_member_offset(struct sbi_platform, cbom_block_size, SBI_PLATFORM_CBOM_BLOCK_SIZE_OFFSET);
+assert_member_offset(struct sbi_platform, suspend_backup_csr_count, SBI_PLATFORM_SUSPEND_BACKUP_CSR_COUNT_OFFSET);
+
 
 /** Get pointer to sbi_platform for sbi_scratch pointer */
 #define sbi_platform_ptr(__s) \
@@ -664,6 +682,48 @@ static inline void sbi_platform_pmp_disable(const struct sbi_platform *plat,
 {
 	if (plat && sbi_platform_ops(plat)->pmp_disable)
 		sbi_platform_ops(plat)->pmp_disable(n);
+}
+
+/**
+ * Platform specific CSR count to backup during suspend.
+ *
+ * @param plat pointer to struct sbi_platform
+ *
+ * @return csr count need backup
+ */
+static inline unsigned long sbi_platform_suspend_backup_csr_count(
+					    const struct sbi_platform *plat)
+{
+	if (plat)
+		return plat->suspend_backup_csr_count;
+	return 0;
+}
+
+/**
+ * Save platform specific CSR before suspend
+ *
+ * @param plat pointer to struct sbi_platform
+ * @param data buffer used to save CSR
+ */
+static inline void sbi_platform_suspend_non_ret_save(
+					    const struct sbi_platform *plat,
+					    unsigned long *data)
+{
+	if (plat && sbi_platform_ops(plat)->suspend_non_ret_save)
+		sbi_platform_ops(plat)->suspend_non_ret_save(data);
+}
+
+/**
+ * Restore platform specific CSR after suspend
+ * @param plat pointer to struct sbi_platform
+ * @param data buffer used to restore CSR
+ */
+static inline void sbi_platform_suspend_non_ret_restore(
+					    const struct sbi_platform *plat,
+					    unsigned long *data)
+{
+	if (plat && sbi_platform_ops(plat)->suspend_non_ret_restore)
+		sbi_platform_ops(plat)->suspend_non_ret_restore(data);
 }
 
 #endif
